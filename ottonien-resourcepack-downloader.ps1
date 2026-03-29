@@ -2,7 +2,10 @@ $LocalZip          = "resourcepacks\Ottonien.zip"
 $RepoOwner         = "Ottonien"
 $RepoName          = "ottonien-reformed"
 $GithubApiUrl      = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
-$AssetName         = "Ottonien.zip" 
+$AssetName         = "Ottonien.zip"
+$LogFile           = "ord-latest.log"
+
+Start-Transcript -Path $LogFile -IncludeInvocationHeader
 
 if (-not (Test-Path $LocalZip)) {
     Write-Host "Lokale ZIP existiert nicht. Erzeuge leere Datei zum Vergleich."
@@ -22,12 +25,14 @@ try {
     $Release = Invoke-RestMethod -Uri $GithubApiUrl -Method Get -Headers $headers
 } catch {
     Write-Error "GitHub-API-Abfrage fehlgeschlagen: $($_.Exception.Message)"
+    Stop-Transcript
     exit 1
 }
 
 $Asset = $Release.assets | Where-Object { $_.name -eq $AssetName }
 if (-not $Asset) {
     Write-Warning "Kein Asset namens '$AssetName' im Release gefunden."
+    Stop-Transcript
     exit 0
 }
 
@@ -38,6 +43,7 @@ $RemoteDigestField  = $Asset.digest
 if (-not $RemoteDigestField) {
     Write-Warning "Kein SHA256-Hash im Release-Asset gefunden. Eventuell Hashes nicht aktiviert."
     Write-Host "Nur Versions-Tag-Vergleich: Lokale ZIP wird nicht automatisch ersetzt."
+    Stop-Transcript
     exit 0
 }
 
@@ -48,6 +54,7 @@ if ($RemoteHash -match "^sha256:([a-fA-F0-9]{64})$") {
 
 if ($RemoteHash -eq $LocalHash) {
     Write-Host "Lokale ZIP ist aktuell (Tag: $RemoteTag, Hash: $RemoteHash)."
+    Stop-Transcript
     exit 0
 }
 
@@ -65,6 +72,7 @@ try {
     if ($DownloadedHash -ne $RemoteHash) {
         Write-Error "Der heruntergeladene Hash ($DownloadedHash) stimmt nicht mit dem Remote-Hash ($RemoteHash) überein."
         Remove-Item -Path $TempZip -Force
+        Stop-Transcript
         exit 1
     }
 
@@ -75,5 +83,6 @@ try {
     if (Test-Path $TempZip) {
         Remove-Item -Path $TempZip -Force
     }
+    Stop-Transcript
     exit 1
 }
